@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { User } from '../types';
 
 interface AuthProps {
-  onAuth: (user: User) => void;
+  onLogin: (userId: string) => void;
 }
 
-export default function Auth({ onAuth }: AuthProps) {
+export default function Auth({ onLogin }: AuthProps) {
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
     name: '',
@@ -27,7 +27,7 @@ export default function Auth({ onAuth }: AuthProps) {
         return;
       }
       // In a real app, we would verify the password here
-      onAuth(existingUser);
+      onLogin(existingUser.id);
     } else {
       if (existingUser) {
         alert('Account already exists. Please login.');
@@ -52,7 +52,7 @@ export default function Auth({ onAuth }: AuthProps) {
         isOnboarded: false
       }));
       
-      onAuth(newUser);
+      onLogin(newUser.id);
     }
   };
 

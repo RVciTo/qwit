@@ -1,125 +1,85 @@
 import { useState, useEffect } from 'react';
-import Papa from 'papaparse';
-import Auth from './components/Auth';
-import Onboarding from './components/Onboarding';
 import Dashboard from './components/Dashboard';
+import Navigation from './components/Navigation';
 import Settings from './components/Settings';
 import AddictionManager from './components/AddictionManager';
-import Navigation from './components/Navigation';
-import { User, Addiction, Message, UserData } from './types';
+import Auth from './components/Auth';
+import { messages } from './data/addictionTypes';
+import type { Addiction } from './types';
 
 export default function App() {
-  const [user, setUser] = useState<User | null>(null);
-  const [isOnboarded, setIsOnboarded] = useState(false);
-  const [addictions, setAddictions] = useState<Addiction[]>([]);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentView, setCurrentView] = useState<'dashboard' | 'settings' | 'addictionManager'>('dashboard');
+  const [addictions, setAddictions] = useState<Addiction[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    // Load messages
-    fetch('/src/data/messages.csv')
-      .then(response => response.text())
-      .then(csv => {
-        const result = Papa.parse(csv, {
-          header: true,
-          transform: (value, field) => {
-            if (field === 'day') return parseInt(value);
-            return value;
-          }
-        });
-        setMessages(result.data as Message[]);
-      });
-  }, []);
-
-  useEffect(() => {
-    if (user) {
-      const userData = localStorage.getItem(`userData_${user.id}`);
-      if (userData) {
-        const parsed = JSON.parse(userData) as UserData;
-        setAddictions(parsed.addictions.map(a => ({
-          ...a,
-          quitDate: new Date(a.quitDate)
-        })));
-        setIsOnboarded(parsed.isOnboarded);
+    const storedUserId = localStorage.getItem('userId');
+    if (storedUserId) {
+      setUserId(storedUserId);
+      setIsAuthenticated(true);
+      
+      try {
+        const storedAddictions = localStorage.getItem(`addictions_${storedUserId}`);
+        if (storedAddictions) {
+          const parsedAddictions = JSON.parse(storedAddictions).map((addiction: any) => ({
+            ...addiction,
+            quitDate: new Date(addiction.quitDate)
+          }));
+          setAddictions(parsedAddictions);
+        }
+      } catch (error) {
+        console.error('Error parsing addictions:', error);
+        localStorage.removeItem(`addictions_${storedUserId}`);
       }
     }
-  }, [user]);
+  }, []);
 
-  const handleAuthComplete = (userData: User) => {
-    setUser(userData);
-  };
-
-  const handleOnboardingComplete = (newAddictions: Addiction[]) => {
-    if (!user) return;
-    
-    const userData: UserData = {
-      user,
-      addictions: newAddictions,
-      isOnboarded: true
-    };
-    
-    localStorage.setItem(`userData_${user.id}`, JSON.stringify(userData));
-    setAddictions(newAddictions);
-    setIsOnboarded(true);
-  };
-
-  const handleUserUpdate = (updatedUser: User) => {
-    setUser(updatedUser);
-    setCurrentView('dashboard');
-  };
-
-  const handleAddictionsUpdate = (updatedAddictions: Addiction[]) => {
-    if (!user) return;
-    
-    const userData: UserData = {
-      user,
-      addictions: updatedAddictions,
-      isOnboarded
-    };
-    
-    localStorage.setItem(`userData_${user.id}`, JSON.stringify(userData));
-    setAddictions(updatedAddictions);
-    setCurrentView('dashboard');
+  const handleLogin = (newUserId: string) => {
+    setUserId(newUserId);
+    setIsAuthenticated(true);
+    localStorage.setItem('userId', newUserId);
   };
 
   const handleLogout = () => {
-    setUser(null);
+    setIsAuthenticated(false);
+    setUserId(null);
+    localStorage.removeItem('userId');
     setAddictions([]);
-    setIsOnboarded(false);
   };
 
-  if (!user) {
-    return <Auth onAuth={handleAuthComplete} />;
-  }
+  const handleUpdateAddictions = (newAddictions: Addiction[]) => {
+    setAddictions(newAddictions);
+    if (userId) {
+      localStorage.setItem(`addictions_${userId}`, JSON.stringify(newAddictions));
+    }
+  };
 
-  if (!isOnboarded) {
-    return <Onboarding onComplete={handleOnboardingComplete} />;
+  if (!isAuthenticated) {
+    return <Auth onLogin={handleLogin} />;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
-      <Navigation
+    <div>
+      <Navigation 
         onSettingsClick={() => setCurrentView('settings')}
         onAddictionManagerClick={() => setCurrentView('addictionManager')}
+        onDashboardClick={() => setCurrentView('dashboard')}
         onLogout={handleLogout}
       />
       
-      <div className="max-w-4xl mx-auto p-6">
-        {currentView === 'dashboard' && (
-          <Dashboard addictions={addictions} messages={messages} />
-        )}
-        
-        {currentView === 'settings' && (
-          <Settings user={user} onUpdate={handleUserUpdate} />
-        )}
-        
-        {currentView === 'addictionManager' && (
-          <AddictionManager
-            addictions={addictions}
-            onUpdate={handleAddictionsUpdate}
-          />
-        )}
-      </div>
+      {currentView === 'dashboard' && (
+        <Dashboard addictions={addictions} messages={messages} />
+      )}
+      {currentView === 'settings' && (
+        <Settings userId={userId!} />
+      )}
+      {currentView === 'addictionManager' && (
+        <AddictionManager 
+          addictions={addictions}
+          onUpdate={handleUpdateAddictions}
+        />
+      )}
     </div>
   );
 }

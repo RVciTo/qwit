@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { User } from '../types';
 
 interface SettingsProps {
@@ -8,14 +8,29 @@ interface SettingsProps {
 
 export default function Settings({ user, onUpdate }: SettingsProps) {
   const [formData, setFormData] = useState({
-    name: user.name,
-    email: user.email,
+    name: '',
+    email: '',
     password: ''
   });
+
+  useEffect(() => {
+    if (user) {
+      setFormData(prev => ({
+        ...prev,
+        name: user.name,
+        email: user.email
+      }));
+    }
+  }, [user]);
+
+  if (!user) {
+    return <div className="p-8">Loading...</div>;
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const updatedUser: User = {
+      ...user,
       name: formData.name,
       email: formData.email
     };
